@@ -1,0 +1,68 @@
+# Script for visit Tata1mg.com > Health Resource Center > All medicines
+# and scraping each medicines url and saving it in a text file 
+
+import requests  # Library to make HTTP requests
+from bs4 import BeautifulSoup  # Library to parse HTML content
+import time  # Library to add delays between requests
+
+# Function to scrape a single page of products for a given letter and page number
+def scrape_page(letter, page_num):
+    # Construct the URL based on the letter (A-Z) and page number
+    url = f"https://www.1mg.com/drugs-all-medicines?page={page_num}&label={letter}"
+
+    # Headers to mimic a browser (prevents the server from blocking requests)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    }
+
+    # Send a request to the page
+    response = requests.get(url, headers=headers)
+
+    # If the response status code is 200 (OK), continue scraping
+    if response.status_code == 200:
+        # Parse the HTML content of the page
+        soup = BeautifulSoup(response.content, "html.parser")
+        
+        # Find all product cards on the page by looking for the appropriate HTML element and class
+        product_cards = soup.find_all("div", class_="style__product-card___1gbex")
+        
+        # Initialize an empty list to store the links of the products
+        links = []
+        for card in product_cards:
+            # For each product card, find the link to the product page (if it exists)
+            link_tag = card.find("a", href=True)
+            if link_tag:
+                # Construct the full URL for the product by combining the base URL and the relative URL from the 'href' attribute
+                full_link = f"https://www.1mg.com{link_tag['href']}"
+                links.append(full_link)  # Add the link to the list
+        
+        # Save the links to a text file named based on the letter and page number (e.g., A_page_1_medicine_links.txt)
+        with open(f"{letter}_page_{page_num}_medicine_links.txt", "w") as file:
+            for link in links:
+                file.write(link + "\n")  # Write each link to the file
+        
+        # Print how many links were scraped and saved for this page
+        print(f"Scraped {len(links)} links from {letter} page {page_num} and saved to '{letter}_page_{page_num}_medicine_links.txt'")
+    else:
+        # If the page couldn't be fetched, print an error message with the status code
+        print(f"Failed to fetch the page for {letter} page {page_num}. Status code: {response.status_code}")
+
+
+# Main loop to scrape pages for all letters A-Z and handle multiple pages per letter
+for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+    page_num = 1  # Start scraping from the first page for each letter
+    while True:
+        # Call the function to scrape the current page for the given letter and page number
+        scrape_page(letter, page_num)
+        
+        # Add a small delay (2 seconds) between requests to avoid overwhelming the server
+        time.sleep(2)
+        
+        # Check if the file for the current page is empty (indicating no products on this page)
+        with open(f"{letter}_page_{page_num}_medicine_links.txt", "r") as file:
+            if not file.read():  # If the file is empty, stop scraping for this letter
+                print(f"Ending scraping for {letter} at page {page_num}. No more products.")
+                break
+        
+        # Increment the page number to scrape the next page for this letter
+        page_num += 1
